@@ -5,38 +5,12 @@ from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 
-def performance_test_mae(self, model_func, test_df, test_data, class_mapping):
-    """
-    Test the performance of the classification model using MAE.
-    Args:
-        model_func (function): Classification function to test (e.g., naive_bayes_classification or id3_classification).
-        test_df (pd.DataFrame): Test dataset.
-        test_data (pd.DataFrame): Ground truth for comparison.
-        class_mapping (dict): Mapping of categorical values to numeric representations.
-    Returns:
-        float: MAE score of the model on the test data.
-    """
-    predictions = []
-    ground_truth = []
-
-    for _, row in test_data.iterrows():
-        test_instance = row.drop(self.target_col)
-        prediction = model_func(test_df, test_instance)
-        predictions.append(class_mapping[prediction])
-        ground_truth.append(class_mapping[row[self.target_col]])
-
-    print(ground_truth)
-    print(predictions)
-
-    # Calculate MAE using numeric representations
-    mae = mean_absolute_error(ground_truth, predictions)
-    return mae
-
-
 import warnings
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", message="X does not have valid feature names, but DecisionTreeClassifier was fitted with feature names")
+from sklearn.metrics import mean_squared_error
+import math
 
 
 class Prediction:
@@ -161,24 +135,50 @@ class Prediction:
             predictions.append(class_mapping[prediction])
             ground_truth.append(class_mapping[row[self.target_col]])
 
-
-        print(predictions)
-        print(ground_truth)
         # Calculate MAE using numeric representations
         mae = mean_absolute_error(ground_truth, predictions)
         return mae
+
+    def performance_test_rmse(self, model_func, test_df, test_data, class_mapping):
+        """
+        Test the performance of the classification model using RMSE.
+        Args:
+            model_func (function): Classification function to test (e.g., naive_bayes_classification or id3_classification).
+            test_df (pd.DataFrame): Test dataset.
+            test_data (pd.DataFrame): Ground truth for comparison.
+            class_mapping (dict): Mapping of categorical values to numeric representations.
+        Returns:
+            float: RMSE score of the model on the test data.
+        """
+        predictions = []
+        ground_truth = []
+
+        for _, row in test_data.iterrows():
+            test_instance = row.drop(self.target_col)
+            prediction = model_func(test_df, test_instance)
+            predictions.append(class_mapping[prediction])
+            ground_truth.append(class_mapping[row[self.target_col]])
+
+        # Calculate RMSE using numeric representations
+        mse = mean_squared_error(ground_truth, predictions)
+        rmse = math.sqrt(mse)
+        return rmse
 
 
 def main():
     data = {
         "Consum": [5402, 6753, 8223, 6281, 4808, 5334, 6011, 5847, 7622, 5659, 5374, 7055, 5784],
         "Productie": [5384, 7059, 7574, 6690, 6337, 5045, 5126, 5449, 6073, 5116, 5156, 6308, 5086],
-        "Sold": [-381, -105, 1033, -143, -572, -491, 600, -300, 1700, -400, -450, 1400, 800]
+        "Intermitent": [1913, 3012, 2014, 1709, 2301, 1833, 840, 1951, 2123, 2057, 2367, 3903, 2182],
+        "Constant": [3471, 4047, 5560, 4981, 4036, 3212, 4286, 3498, 3950, 3458, 2789, 2405, 2904],
+        "Sold": [18, -306, 649, -409, -1529, 289, 885, 398, 1549, 144, 218, 747, 698]
     }
 
     rules = {
         "Consum": ([4500, 5500, 6500, 7500, 8500], ["Mic", "Mediu", "Mare", "Foarte Mare"]),
         "Productie": ([5000, 6000, 7000, 8000], ["Mic", "Mediu", "Mare"]),
+        "Intermitent": ([800, 2000, 3200, 4400], ["Mic", "Mediu", "Mare"]),
+        "Constant": ([2200, 3400, 4600, 5800], ["Mic", "Mediu", "Mare"]),
         "Sold": ([-np.inf, -500, 500, 1500, np.inf], ["Negativ Mic", "Echilibrat", "Pozitiv Mic", "Pozitiv Mare"])
     }
 
@@ -193,7 +193,7 @@ def main():
     prediction_model = Prediction(data, rules, target_col)
 
     # Example test instance
-    test_instance = pd.Series({"Consum": "Foarte Mare", "Productie": "Mare"})
+    test_instance = pd.Series({"Consum": "Foarte Mare", "Productie": "Mare", "Intermitent": "Mare", "Constant": "Mic"})
 
     train_df, test_df = train_test_split(prediction_model.df_discretized, test_size=0.3, random_state=42)
 
@@ -204,15 +204,26 @@ def main():
     # ID3 prediction
     id3_result = prediction_model.id3_classification(train_df, test_instance)
     print("ID3 Result:", id3_result)
+    print('\n')
 
-    # Performance testing
+    # Performance testing MAE
     accuracy_nb = prediction_model.performance_test_mae(prediction_model.naive_bayes_classification,
-                                                    train_df, test_df, class_mapping)
-    print(f"Naive Bayes Accuracy: {accuracy_nb:.2f}")
+                                                        train_df, test_df, class_mapping)
+    print(f"Naive Bayes MAE: {accuracy_nb:.2f}")
 
     accuracy_id3 = prediction_model.performance_test_mae(prediction_model.id3_classification,
-                                                     prediction_model.df_discretized, test_df,class_mapping)
-    print(f"ID3 Accuracy: {accuracy_id3:.2f}")
+                                                         prediction_model.df_discretized, test_df, class_mapping)
+    print(f"ID3 MAE: {accuracy_id3:.2f}")
+
+    # Performance testing RMSE
+    rmse_nb = prediction_model.performance_test_rmse(prediction_model.naive_bayes_classification,
+                                                     train_df, test_df, class_mapping)
+    print(f"Naive Bayes RMSE: {rmse_nb:.2f}")
+
+    rmse_id3 = prediction_model.performance_test_rmse(prediction_model.id3_classification,
+                                                      prediction_model.df_discretized, test_df, class_mapping)
+    print(f"ID3 RMSE: {rmse_id3:.2f}")
+
 
 if __name__ == "__main__":
     main()
